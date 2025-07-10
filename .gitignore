@@ -1,0 +1,5 @@
+# .gitignore
+.env           # Ignore environment variables
+*.log          # Ignore log files
+__pycache__/   # Ignore Python cache
+config.py      # Ignore if using config file
