@@ -1,0 +1,131 @@
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    CallbackContext,
+    CallbackQueryHandler,
+    ConversationHandler
+)
+
+# Enable logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+    filename="airdrop_bot.log"  # Logs will be saved to this file
+)
+logger = logging.getLogger(__name__)
+
+# Configuration - REPLACE THESE WITH YOUR ACTUAL LINKS
+BOT_TOKEN = "8006176484:AAFLd-7E7GOF9YA7Lwocm_CBk5BRvDbIU4M"
+CHANNEL_LINK = "https://t.me/your_channel"  # Replace with your channel
+GROUP_LINK = "https://t.me/your_group"     # Replace with your group
+TWITTER_LINK = "https://twitter.com/your_profile"  # Replace with your Twitter
+
+# Conversation states
+ASKING_WALLET = 1
+
+async def start(update: Update, context: CallbackContext) -> None:
+    """Send welcome message with join instructions"""
+    user = update.effective_user
+    logger.info(f"New user started: {user.id} - {user.full_name}")
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("📢 Join Channel", url=CHANNEL_LINK),
+            InlineKeyboardButton("👥 Join Group", url=GROUP_LINK),
+        ],
+        [InlineKeyboardButton("🐦 Follow Twitter", url=TWITTER_LINK)],
+        [InlineKeyboardButton("✅ I've Joined All", callback_data="joined")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        f"🌟 Welcome {user.first_name}!\n\n"
+        "Claim your 10 SOL test airdrop by completing these simple steps:\n\n"
+        "1. Join our Telegram channel\n"
+        "2. Join our Telegram group\n"
+        "3. Follow us on Twitter\n\n"
+        "Click the links below then press ✅ I've Joined All:",
+        reply_markup=reply_markup,
+        disable_web_page_preview=True
+    )
+
+async def joined_button(update: Update, context: CallbackContext) -> int:
+    """Handle the 'I've Joined' button press"""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        text="✅ Great! Now send me your Solana wallet address.\n\n"
+             "Example: `7u5Z5XhAeQ9eS3XbY4fL6WJk2M8nVc1xR9T`\n"
+             "⚠️ Make sure it's a valid Solana address!",
+        parse_mode="Markdown"
+    )
+    return ASKING_WALLET
+
+async def handle_wallet(update: Update, context: CallbackContext) -> int:
+    """Receive wallet address and send confirmation"""
+    wallet_address = update.message.text
+    user = update.effective_user
+    logger.info(f"Wallet submitted by {user.id}: {wallet_address}")
+    
+    # Generate a fake transaction ID for realism
+    fake_tx_id = "5gP4Z" + "".join([str((ord(c) % 10)) for c in user.full_name]) + "aBcDeF"
+    
+    await update.message.reply_text(
+        f"🎉 Congratulations {user.first_name}!\n\n"
+        "𝟭𝟬 𝗦𝗢𝗟 has been sent to your wallet:\n"
+        f"`{wallet_address}`\n\n"
+        f"🔗 Transaction ID: `{fake_tx_id}`\n"
+        "⏱ Confirmation time: 2 network confirmations\n"
+        "💸 Network fee: 0.000005 SOL\n\n"
+        "<b>Note:</b> This is a test environment - no actual tokens will be sent. "
+        "You can use /start to try again with a different address.",
+        parse_mode="HTML"
+    )
+    return ConversationHandler.END
+
+async def cancel(update: Update, context: CallbackContext) -> int:
+    """Cancel the conversation"""
+    await update.message.reply_text("❌ Operation cancelled. Use /start to begin again.")
+    return ConversationHandler.END
+
+async def help_command(update: Update, context: CallbackContext) -> None:
+    """Send help message"""
+    await update.message.reply_text(
+        "ℹ️ <b>Airdrop Bot Help</b>\n\n"
+        "/start - Begin the airdrop process\n"
+        "/help - Show this help message\n"
+        "/cancel - Cancel current operation\n\n"
+        "This is a TEST bot for demonstration purposes only. "
+        "No real cryptocurrency will be distributed.",
+        parse_mode="HTML"
+    )
+
+def main() -> None:
+    """Run the bot"""
+    application = Application.builder().token(BOT_TOKEN).build()
+
+    # Conversation handler for wallet submission flow
+    conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(joined_button, pattern="^joined$")],
+        states={
+            ASKING_WALLET: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_wallet)]
+        },
+        fallbacks=[CommandHandler("cancel", cancel)]
+    )
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("cancel", cancel))
+    application.add_handler(conv_handler)
+
+    # Start the bot
+    logger.info("Airdrop Bot is now running...")
+    print("Bot is running. Press CTRL+C to stop.")
+    application.run_polling()
+
+if __name__ == "__main__":
+    main()
